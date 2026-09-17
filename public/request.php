@@ -68,7 +68,7 @@ header('Content-Type: text/html; charset=UTF-8');
     <link rel="stylesheet" href="assets/workspace.css">
 </head>
 <body class="workspace-page detail-page">
-    <?php securepass_render_workspace_start($user, 'requests', 'Request details', (string) $request['reference_number']); ?>
+    <?php securepass_render_workspace_start($user, 'dashboard', 'Request details', (string) $request['reference_number']); ?>
     <main class="content-layout" id="main-content">
         <a class="back-link" href="requests.php">← Request Summary</a>
         <p class="eyebrow">Gate pass request</p>

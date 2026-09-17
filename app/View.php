@@ -46,11 +46,7 @@ function securepass_render_workspace_start(array $user, string $active, string $
             <a class="workspace-brand" href="requests.php" aria-label="La Rose Noire Secure Pass dashboard"><span class="workspace-brand-mark">SP</span><span class="workspace-brand-copy"><strong>LA ROSE NOIRE</strong><small>SECURE PASS</small></span></a>
             <nav class="workspace-nav" aria-label="Main navigation">
                 <a class="<?= $active === 'dashboard' ? 'is-active' : '' ?>" href="requests.php" <?= $active === 'dashboard' ? 'aria-current="page"' : '' ?>><?= securepass_icon('home') ?><span>Dashboard</span></a>
-                <?php if ($user['can_create']): ?><a class="<?= $active === 'form' ? 'is-active' : '' ?>" href="request_new.php" <?= $active === 'form' ? 'aria-current="page"' : '' ?>><?= securepass_icon('plus') ?><span>New request</span></a><?php endif; ?>
-                <a class="<?= $active === 'requests' ? 'is-active' : '' ?>" href="requests.php#request-summary" <?= $active === 'requests' ? 'aria-current="page"' : '' ?>><?= securepass_icon('file') ?><span>Requests</span></a>
-                <span class="workspace-nav-disabled" aria-disabled="true" title="Approval workspace coming soon"><?= securepass_icon('check') ?><span>Pending approvals</span></span>
-                <span class="workspace-nav-disabled" aria-disabled="true" title="Activity logs coming soon"><?= securepass_icon('clock') ?><span>Activity logs</span></span>
-                <span class="workspace-nav-disabled" aria-disabled="true" title="Settings coming soon"><?= securepass_icon('settings') ?><span>Settings</span></span>
+                <?php if ($user['can_create']): ?><a class="<?= $active === 'form' ? 'is-active' : '' ?>" href="request_new.php" <?= $active === 'form' ? 'aria-current="page"' : '' ?>><?= securepass_icon('plus') ?><span>Request Form</span></a><?php endif; ?>
             </nav>
             <div class="workspace-sidebar-bottom"><img src="assets/sidebar-landscape.svg" alt="" aria-hidden="true"><form method="post" action="logout.php"><input type="hidden" name="csrf_token" value="<?= securepass_h(securepass_csrf_token()) ?>"><button type="submit"><?= securepass_icon('logout') ?><span>Sign out</span></button></form></div>
         </aside>

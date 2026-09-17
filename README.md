@@ -27,7 +27,7 @@ The revamp uses existing active accounts in `dbo.lrnph_users` for password verif
 
 ## Dashboard UI
 
-After sign-in, `requests.php` is the main dashboard. Its sidebar, top bar, illustrated banner, four status totals, filters, and request table follow the supplied dashboard reference. The cards use the request states that exist in the test schema: Approved, Rejected, Pending, and Draft. Search, created-date range, status, current approval step, page size, detail links, and CSV export work on the signed-in creator's requests. The CSV export includes up to 1,000 matching requests. `dashboard.php` redirects to this page for older links. The three-step request form keeps its existing fixed layout inside the same sidebar and top bar. Request details share that shell as well. Approval workspace, activity logs, settings, and return tracking are still to be built; their sidebar labels are disabled.
+After sign-in, `requests.php` is the main dashboard. Its sidebar, top bar, illustrated banner, four status totals, filters, and request table follow the supplied dashboard reference. The sidebar has only Dashboard and Request Form; sign out remains at the bottom. The cards use the request states that exist in the test schema: Approved, Rejected, Pending, and Draft. Search, created-date range, status, current approval step, page size, detail links, and CSV export work on the signed-in creator's requests. The CSV export includes up to 1,000 matching requests. `dashboard.php` redirects to this page for older links. The three-step request form keeps its existing fixed layout inside the same sidebar and top bar. Request details share that shell as well. Approval workspace, activity logs, settings, and return tracking are still to be built.
 
 ## Request creation
 
