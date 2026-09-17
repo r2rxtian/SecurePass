@@ -1,0 +1,4 @@
+/config/local.php
+/config/test-credentials.local.txt
+/storage/
+/.phpunit.cache/
