@@ -30,6 +30,9 @@ try {
     }
     $startDate = securepass_dashboard_date($_GET['start_date'] ?? '');
     $endDate = securepass_dashboard_date($_GET['end_date'] ?? '');
+    $dateError = $startDate !== '' && $endDate !== '' && $endDate < $startDate
+        ? 'End date must be on or after start date.'
+        : '';
     $perPage = (int) ($_GET['per_page'] ?? 10);
     if (!in_array($perPage, [10, 25, 50], true)) {
         $perPage = 10;
@@ -66,9 +69,22 @@ try {
         $parameters[] = $endDate;
     }
     if ($search !== '') {
-        $where .= ' AND (r.reference_number LIKE ? OR r.company LIKE ? OR r.category LIKE ? OR EXISTS (SELECT 1 FROM dbo.acdsecurepass_items AS si WHERE si.request_id = r.request_id AND si.item_name LIKE ?))';
-        $like = '%' . $search . '%';
-        array_push($parameters, $like, $like, $like, $like);
+        $where .= ' AND (CHARINDEX(?, r.reference_number) > 0 OR CHARINDEX(?, r.company) > 0'
+            . ' OR CHARINDEX(?, r.category) > 0'
+            . ' OR EXISTS (SELECT 1 FROM dbo.acdsecurepass_items AS si'
+            . ' WHERE si.request_id = r.request_id AND CHARINDEX(?, si.item_name) > 0)';
+        array_push($parameters, $search, $search, $search, $search);
+        $matchingCategories = [];
+        foreach (securepass_categories() as $code => $label) {
+            if (mb_stripos($label, $search) !== false) {
+                $matchingCategories[] = $code;
+            }
+        }
+        if ($matchingCategories !== []) {
+            $where .= ' OR r.category IN (' . implode(', ', array_fill(0, count($matchingCategories), '?')) . ')';
+            array_push($parameters, ...$matchingCategories);
+        }
+        $where .= ')';
     }
 
     $countStatement = $db->prepare('SELECT COUNT(*) FROM dbo.acdsecurepass_requests AS r ' . $where);
@@ -124,6 +140,12 @@ try {
 $created = $_SESSION['securepass_created_reference'] ?? null;
 unset($_SESSION['securepass_created_reference']);
 $filterCount = (int) ($search !== '') + (int) ($status !== 'all') + (int) ($stage !== 'all') + (int) ($startDate !== '') + (int) ($endDate !== '');
+$appliedFilters = [];
+if ($search !== '') $appliedFilters[] = 'Search: ' . $search;
+if ($status !== 'all') $appliedFilters[] = 'Status: ' . securepass_status_label($status);
+if ($stage !== 'all') $appliedFilters[] = 'Approval step: ' . securepass_stage_label($stage);
+if ($startDate !== '') $appliedFilters[] = 'Created from: ' . securepass_display_date($startDate);
+if ($endDate !== '') $appliedFilters[] = 'Created to: ' . securepass_display_date($endDate);
 $filterParams = ['search' => $search, 'start_date' => $startDate, 'end_date' => $endDate, 'status' => $status, 'stage' => $stage, 'per_page' => $perPage];
 $pageUrl = static fn (int $targetPage): string => 'requests.php?' . http_build_query($filterParams + ['page' => $targetPage]) . '#request-summary';
 $metricCards = [
@@ -144,9 +166,12 @@ header('Content-Type: text/html; charset=UTF-8');
     <link rel="stylesheet" href="assets/app.css">
     <link rel="stylesheet" href="assets/workspace.css">
     <link rel="stylesheet" href="assets/dashboard.css">
+    <script src="assets/dashboard-filters.js" defer></script>
+    <script src="assets/gsap.min.js" defer></script>
+    <script src="assets/workspace-motion.js" defer></script>
 </head>
 <body class="workspace-page dashboard-page">
-    <?php securepass_render_workspace_start($user, 'dashboard', 'Dashboard', 'Request overview'); ?>
+    <?php securepass_render_workspace_start($user, 'dashboard', 'Dashboard', 'Request overview', $totals); ?>
     <main class="dashboard-main" id="main-content">
         <section class="dashboard-hero" aria-labelledby="hero-title">
             <div class="dashboard-hero-copy"><h2 id="hero-title">Every request, clearly tracked.</h2><p>Create, submit, track, and manage your Secure Pass requests in one place.</p></div>
@@ -163,17 +188,27 @@ header('Content-Type: text/html; charset=UTF-8');
         </section>
 
         <section class="dashboard-summary" id="request-summary" aria-labelledby="summary-title">
-            <div class="dashboard-summary-heading"><h2 id="summary-title">Request summary</h2><a class="dashboard-export" href="requests.php?<?= securepass_h(http_build_query($filterParams + ['export' => 'csv'])) ?>"><?= securepass_icon('download') ?> Export CSV</a></div>
-            <form class="dashboard-filters" method="get" action="requests.php#request-summary">
-                <label class="dashboard-search"><span class="sr-only">Search requests</span><?= securepass_icon('search') ?><input type="search" name="search" value="<?= securepass_h($search) ?>" placeholder="Search requests..."></label>
-                <label><span>Start date</span><input type="date" name="start_date" value="<?= securepass_h($startDate) ?>"></label>
-                <label><span>End date</span><input type="date" name="end_date" value="<?= securepass_h($endDate) ?>"></label>
-                <label><span>Status</span><select name="status"><option value="all">All</option><?php foreach (['approved', 'rejected', 'pending', 'draft', 'cancelled'] as $option): ?><option value="<?= $option ?>" <?= $status === $option ? 'selected' : '' ?>><?= securepass_status_label($option) ?></option><?php endforeach; ?></select></label>
-                <label><span>Current approver</span><select name="stage"><option value="all">All</option><?php foreach (['department_head', 'admin_approver', 'finance', 'executive', 'security'] as $option): ?><option value="<?= $option ?>" <?= $stage === $option ? 'selected' : '' ?>><?= securepass_stage_label($option) ?></option><?php endforeach; ?></select></label>
+            <div class="dashboard-summary-heading"><h2 id="summary-title">Request summary</h2><span class="dashboard-filter-feedback" role="status" aria-live="polite"></span><a class="dashboard-export" href="requests.php?<?= securepass_h(http_build_query($filterParams + ['export' => 'csv'])) ?>"><?= securepass_icon('download') ?> Export CSV</a></div>
+            <form class="dashboard-filters" id="dashboard-filters" method="get" action="requests.php#request-summary">
+                <label class="dashboard-search"><span class="sr-only">Search requests</span><?= securepass_icon('search') ?><input type="search" name="search" value="<?= securepass_h($search) ?>" placeholder="Search reference, item, or destination" maxlength="100"></label>
+                <button class="dashboard-search-button" type="submit"><?= securepass_icon('search') ?> Search</button>
+                <details class="dashboard-filter-menu" id="dashboard-filter-menu" <?= $dateError !== '' ? 'open' : '' ?>>
+                    <summary class="dashboard-filter-toggle"><?= securepass_icon('filter') ?><span>Filters</span><span class="dashboard-filter-count" <?= $filterCount === 0 ? 'hidden' : '' ?>><?= $filterCount ?></span><?= securepass_icon('chevron') ?></summary>
+                    <div class="dashboard-filter-panel">
+                        <div class="dashboard-filter-panel-heading"><strong>Filter requests</strong><span>Choose filters, then select Apply filters.</span></div>
+                        <div class="dashboard-filter-fields">
+                            <label><span>Status</span><select name="status"><option value="all">All statuses</option><?php foreach (['approved', 'rejected', 'pending', 'draft', 'cancelled'] as $option): ?><option value="<?= $option ?>" <?= $status === $option ? 'selected' : '' ?>><?= securepass_status_label($option) ?></option><?php endforeach; ?></select></label>
+                            <label><span>Approval step</span><select name="stage"><option value="all">All steps</option><?php foreach (['department_head', 'admin_approver', 'finance', 'executive', 'security'] as $option): ?><option value="<?= $option ?>" <?= $stage === $option ? 'selected' : '' ?>><?= securepass_stage_label($option) ?></option><?php endforeach; ?></select></label>
+                            <label><span>Created from</span><input type="date" name="start_date" value="<?= securepass_h($startDate) ?>"></label>
+                            <label><span>Created to</span><input type="date" name="end_date" value="<?= securepass_h($endDate) ?>"></label>
+                        </div>
+                        <div class="dashboard-filter-actions"><a class="dashboard-reset-button dashboard-clear-filters" href="requests.php#request-summary"><?= securepass_icon('reset') ?> Clear all</a><button class="dashboard-filter-button" type="submit"><?= securepass_icon('check') ?> Apply filters</button></div>
+                    </div>
+                </details>
                 <input type="hidden" name="per_page" value="<?= $perPage ?>">
-                <button class="dashboard-filter-button" type="submit"><?= securepass_icon('filter') ?> Filter</button>
-                <a class="dashboard-reset-button" href="requests.php#request-summary"><?= securepass_icon('reset') ?> Reset</a>
             </form>
+            <?php if ($dateError !== ''): ?><p class="dashboard-filter-error" role="alert"><?= securepass_h($dateError) ?></p><?php endif; ?>
+            <div class="dashboard-applied-filters" aria-label="Applied filters"><span class="dashboard-applied-label">APPLIED</span><?php if ($appliedFilters === []): ?><span class="dashboard-applied-empty">All requests</span><?php else: ?><?php foreach ($appliedFilters as $label): ?><span class="dashboard-applied-chip"><?= securepass_h($label) ?></span><?php endforeach; ?><a class="dashboard-clear-filters" href="requests.php#request-summary">Clear all</a><?php endif; ?></div>
             <div class="dashboard-table-scroll"><table class="dashboard-table"><thead><tr><th scope="col">Reference no.</th><th scope="col">Category</th><th scope="col">Item</th><th scope="col">Qty</th><th scope="col">Created</th><th scope="col">Release date</th><th scope="col">Return date</th><th scope="col">Status</th><th scope="col">Approver</th><th scope="col">Actions</th></tr></thead><tbody>
                 <?php if ($requests === []): ?><tr><td class="dashboard-empty-cell" colspan="10"><div class="dashboard-empty"><img src="assets/empty-inbox.svg" alt="" aria-hidden="true"><h3><?= $filterCount ? 'No matching requests' : 'No requests yet' ?></h3><p><?= $filterCount ? 'Try different filters or reset the search.' : 'Your requests will appear here.' ?></p></div></td></tr><?php else: ?>
                     <?php foreach ($requests as $request): ?><tr><td><a class="dashboard-reference" href="request.php?id=<?= (int) $request['request_id'] ?>"><?= securepass_h($request['reference_number']) ?></a></td><td><?= securepass_h(securepass_categories()[$request['category']] ?? $request['category']) ?></td><td><strong><?= securepass_h($request['first_item'] ?: $request['company']) ?></strong><?php if ((int) $request['item_count'] > 1): ?><small>+ <?= (int) $request['item_count'] - 1 ?> more</small><?php endif; ?></td><td><?= securepass_h($request['first_quantity'] ?? '—') ?></td><td><?= securepass_h(securepass_display_date($request['created_at'])) ?></td><td><?= securepass_h(securepass_display_date($request['release_date'])) ?></td><td><?= securepass_h(securepass_display_date($request['return_date'])) ?></td><td><span class="dashboard-status dashboard-status-<?= securepass_h($request['status']) ?>"><?= securepass_icon(match ($request['status']) { 'approved' => 'check', 'rejected' => 'close', 'pending' => 'clock', default => 'edit' }) ?> <?= securepass_h(securepass_status_label((string) $request['status'])) ?></span></td><td><?= securepass_h(securepass_stage_label($request['current_stage'])) ?></td><td><a class="dashboard-detail-link" href="request.php?id=<?= (int) $request['request_id'] ?>">View details <?= securepass_icon('chevron') ?></a></td></tr><?php endforeach; ?>

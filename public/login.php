@@ -35,10 +35,15 @@ header('Content-Type: text/html; charset=UTF-8');
     <meta name="description" content="Sign in to La Rose Noire Secure Pass.">
     <title>Sign in · Secure Pass</title>
     <link rel="stylesheet" href="assets/app.css">
+    <link rel="stylesheet" href="assets/login.css">
+    <script src="assets/gsap.min.js" defer></script>
+    <script src="assets/login.js" defer></script>
+    <script src="assets/workspace-motion.js" defer></script>
 </head>
 <body class="login-page">
     <main class="login-layout">
         <section class="login-intro" aria-label="About Secure Pass">
+            <span class="login-glow" aria-hidden="true"></span>
             <div class="login-brand"><span class="brand-mark"><span>SP</span></span><span>LA ROSE NOIRE <span class="brand-divider">|</span> SECURE PASS</span></div>
             <div class="login-intro-content"><span class="login-kicker">REQUEST MANAGEMENT</span><span class="login-art" aria-hidden="true"><?= securepass_icon('clipboard') ?><span><?= securepass_icon('shield') ?></span></span><h1>Every request.<br>Clear from start<br>to finish.</h1><p>Create and track secure pass requests in one place.</p></div>
             <p class="login-environment">Secure Pass Revamp <span>·</span> Test environment</p>

@@ -81,3 +81,5 @@
 @media(max-width:900px){.request-form-page .form-workspace{width:calc(100% - 24px)}}
 @media(max-width:780px){.request-form-page.workspace-page{height:auto;min-height:100dvh;overflow:auto}.request-form-page .workspace-content{height:auto;min-height:calc(100dvh - 105px)}.request-form-page .form-workspace{min-height:650px}.request-form-page .request-wizard{min-height:550px}}
 @media(max-width:650px), (max-height:640px){.request-form-page.workspace-page{height:auto;overflow:auto}.request-form-page .workspace-content{height:auto}.request-form-page .form-workspace{min-height:0}.request-form-page .request-wizard{min-height:570px}}
+
+.request-form-page .wizard-next:hover,.request-form-page .outline-button:hover{transform:none}

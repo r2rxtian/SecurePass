@@ -84,6 +84,8 @@ header('Content-Type: text/html; charset=UTF-8');
     <link rel="stylesheet" href="assets/workspace.css">
     <link rel="stylesheet" href="assets/request-form.css">
     <script src="assets/request.js" defer></script>
+    <script src="assets/gsap.min.js" defer></script>
+    <script src="assets/workspace-motion.js" defer></script>
 </head>
 <body class="workspace-page request-form-page">
     <?php securepass_render_workspace_start($user, 'form', 'New request', 'Create a secure pass'); ?>

@@ -30,8 +30,10 @@ function securepass_icon(string $name, string $class = ''): string
     return '<svg class="icon ' . securepass_h($class) . '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' . $path . '</svg>';
 }
 
-/** @param array<string, mixed> $user */
-function securepass_render_workspace_start(array $user, string $active, string $title, string $subtitle): void
+/** @param array<string, mixed> $user
+ *  @param array<string, mixed>|null $requestTotals
+ */
+function securepass_render_workspace_start(array $user, string $active, string $title, string $subtitle, ?array $requestTotals = null): void
 {
     $name = trim((string) $user['display_name']);
     $initials = '';
@@ -39,6 +41,23 @@ function securepass_render_workspace_start(array $user, string $active, string $
         $initials .= mb_strtoupper(mb_substr($part, 0, 1));
     }
     $now = new DateTimeImmutable('now', new DateTimeZone('Asia/Manila'));
+    if ($requestTotals === null) {
+        try {
+            $statement = securepass_db()->prepare(<<<'SQL'
+                SELECT COUNT(*) AS total,
+                       COALESCE(SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END), 0) AS pending,
+                       COALESCE(SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END), 0) AS approved
+                FROM dbo.acdsecurepass_requests WHERE creator_bio_id = ?
+                SQL);
+            $statement->execute([$user['empcode']]);
+            $requestTotals = $statement->fetch() ?: null;
+        } catch (Throwable $exception) {
+            error_log('SecurePass Revamp sidebar totals failed: ' . $exception->getMessage());
+        }
+    }
+    $totalCount = isset($requestTotals['total']) ? (int) $requestTotals['total'] : null;
+    $pendingCount = isset($requestTotals['pending']) ? (int) $requestTotals['pending'] : null;
+    $approvedCount = isset($requestTotals['approved']) ? (int) $requestTotals['approved'] : null;
     ?>
     <a class="skip-link" href="#main-content">Skip to content</a>
     <div class="workspace-shell">
@@ -46,9 +65,18 @@ function securepass_render_workspace_start(array $user, string $active, string $
             <a class="workspace-brand" href="requests.php" aria-label="La Rose Noire Secure Pass dashboard"><span class="workspace-brand-mark">SP</span><span class="workspace-brand-copy"><strong>LA ROSE NOIRE</strong><small>SECURE PASS</small></span></a>
             <nav class="workspace-nav" aria-label="Main navigation">
                 <a class="<?= $active === 'dashboard' ? 'is-active' : '' ?>" href="requests.php" <?= $active === 'dashboard' ? 'aria-current="page"' : '' ?>><?= securepass_icon('home') ?><span>Dashboard</span></a>
-                <?php if ($user['can_create']): ?><a class="<?= $active === 'form' ? 'is-active' : '' ?>" href="request_new.php" <?= $active === 'form' ? 'aria-current="page"' : '' ?>><?= securepass_icon('plus') ?><span>Request Form</span></a><?php endif; ?>
+                <?php if ($user['can_create']): ?><a class="workspace-nav-create <?= $active === 'form' ? 'is-active' : '' ?>" href="request_new.php" <?= $active === 'form' ? 'aria-current="page"' : '' ?>><?= securepass_icon('plus') ?><span>New request</span></a><?php endif; ?>
             </nav>
-            <div class="workspace-sidebar-bottom"><img src="assets/sidebar-landscape.svg" alt="" aria-hidden="true"><form method="post" action="logout.php"><input type="hidden" name="csrf_token" value="<?= securepass_h(securepass_csrf_token()) ?>"><button type="submit"><?= securepass_icon('logout') ?><span>Sign out</span></button></form></div>
+            <section class="workspace-sidebar-overview" aria-label="My request snapshot">
+                <span class="workspace-sidebar-kicker">MY REQUESTS</span>
+                <div class="workspace-sidebar-total"><strong><?= $totalCount ?? '—' ?></strong><span>Total requests</span></div>
+                <a href="requests.php?status=pending#request-summary"><span><i class="workspace-status-dot workspace-status-pending" aria-hidden="true"></i>Pending</span><strong><?= $pendingCount ?? '—' ?></strong></a>
+                <a href="requests.php?status=approved#request-summary"><span><i class="workspace-status-dot workspace-status-approved" aria-hidden="true"></i>Approved</span><strong><?= $approvedCount ?? '—' ?></strong></a>
+            </section>
+            <div class="workspace-sidebar-bottom">
+                <div class="workspace-sidebar-person"><span class="workspace-sidebar-avatar"><?= securepass_h($initials ?: 'SP') ?></span><span><strong><?= securepass_h($name) ?></strong><small><?= securepass_h($user['department']) ?></small></span></div>
+                <form method="post" action="logout.php"><input type="hidden" name="csrf_token" value="<?= securepass_h(securepass_csrf_token()) ?>"><button type="submit"><?= securepass_icon('logout') ?><span>Sign out</span></button></form>
+            </div>
         </aside>
         <div class="workspace-content">
             <header class="workspace-topbar"><div class="workspace-page-title"><span>SECURE PASS</span><h1><?= securepass_h($title) ?></h1><p><?= securepass_h($subtitle) ?></p></div><div class="workspace-topbar-right"><time datetime="<?= securepass_h($now->format('c')) ?>"><?= securepass_h($now->format('M j, Y')) ?></time><span class="workspace-time"><?= securepass_h($now->format('g:i A')) ?></span><details class="workspace-account"><summary><span class="workspace-avatar"><?= securepass_h($initials ?: 'SP') ?></span><span class="workspace-account-copy"><strong><?= securepass_h($name) ?></strong><small><?= securepass_h($user['department']) ?></small></span><?= securepass_icon('chevron') ?></summary><div class="workspace-account-panel"><small>Signed in as</small><strong><?= securepass_h($user['username']) ?></strong><?php if ($user['is_test_user']): ?><span>Test account</span><?php endif; ?><form method="post" action="logout.php"><input type="hidden" name="csrf_token" value="<?= securepass_h(securepass_csrf_token()) ?>"><button type="submit">Sign out</button></form></div></details></div></header>

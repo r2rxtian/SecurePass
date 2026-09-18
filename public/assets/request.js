@@ -15,6 +15,8 @@ let step = Number(form.dataset.startStep) || 0;
 let itemIndex = 0;
 let reviewPage = 0;
 let nextIndex = Math.max(0, ...[...items.querySelectorAll('[data-item-index]')].map(row => Number(row.dataset.itemIndex))) + 1;
+let stepInitialized = false;
+let itemInitialized = false;
 
 function cards() {
   return [...items.querySelectorAll('.wizard-item')];
@@ -22,6 +24,7 @@ function cards() {
 
 function showItem(index) {
   const rows = cards();
+  const previous = itemIndex;
   itemIndex = Math.max(0, Math.min(index, rows.length - 1));
   rows.forEach((row, position) => {
     row.hidden = position !== itemIndex;
@@ -34,9 +37,14 @@ function showItem(index) {
   previousItem.disabled = itemIndex === 0;
   nextItem.disabled = itemIndex === rows.length - 1;
   addButton.disabled = rows.length >= 20;
+  if (itemInitialized && previous !== itemIndex) {
+    form.dispatchEvent(new CustomEvent('securepass:itemchange', { bubbles: true, detail: { item: rows[itemIndex] } }));
+  }
+  itemInitialized = true;
 }
 
 function showStep(target) {
+  const previous = step;
   step = target;
   panels.forEach((panel, index) => {
     panel.hidden = index !== step;
@@ -54,6 +62,10 @@ function showStep(target) {
   if (step === 1) showItem(itemIndex);
   if (step === 2) renderReview();
   panels[step].querySelector('h2')?.focus({ preventScroll: true });
+  if (stepInitialized && previous !== step) {
+    form.dispatchEvent(new CustomEvent('securepass:stepchange', { bubbles: true, detail: { step, previous, panel: panels[step] } }));
+  }
+  stepInitialized = true;
 }
 
 function refreshCategory() {
